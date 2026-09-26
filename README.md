@@ -242,7 +242,7 @@ Once an 82579 device is attached to a VM, stop the VM and return the ownership t
 * Fix - Handle Management Engine blocking PHY access for a time after resests
 * Fix - Semaphore imbalance for 82573 parts
 
-**Changelog for 3.8.7-nvm-bypass (this fork, 2026)**
+**Changelog for 3.8.7-nvm-bypass (this fork, 2026-03)**
 * Bypass NVM checksum validation in `netdev.c` — works around the long-standing
   "NVM Checksum Error" affecting Intel I219 NICs on certain boards (checksum
   fails but hardware is functional; Windows ignores this check entirely)
@@ -255,4 +255,16 @@ Once an 82579 device is attached to a VM, stop the VM and return the ownership t
   basic NIC operation, and the current PTP API is incompatible with this
   driver version
 * Added one-command DKMS install script (`install.sh`)
-* Tested on kernel `6.17.2-1-pve` (Proxmox VE), Intel Ethernet Connection I219-LM
+
+**Changelog for 3.8.7-nvm-bypass (2026-09 update)**
+* No source code changes — confirmed the existing patch builds and runs
+  correctly, unmodified, on kernel 7.0.14-19-pve
+* Added `UPGRADING.md`: documents the DKMS recompilation step required
+  after any major kernel version jump (this is a DKMS/kernel-packaging
+  consideration, not something specific to this driver — but easy to miss)
+
+### Tested on
+
+- Kernel `6.17.2-1-pve` (Proxmox VE) — Intel Ethernet Connection I219-LM — original patch. 
+- Kernel `7.0.14-19-pve` (Proxmox VE) — confirmed working **unmodified**, no source changes required.  
+See [`UPGRADING.md`](./UPGRADING.md) for the DKMS recompilation step needed whenever you jump to a new kernel.
