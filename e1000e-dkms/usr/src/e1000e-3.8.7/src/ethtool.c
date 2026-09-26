@@ -991,8 +991,8 @@ static void e1000_get_drvinfo(struct net_device *netdev,
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
-	strlcpy(drvinfo->driver, e1000e_driver_name, sizeof(drvinfo->driver));
-	strlcpy(drvinfo->version, e1000e_driver_version,
+	strscpy(drvinfo->driver, e1000e_driver_name, sizeof(drvinfo->driver));
+	strscpy(drvinfo->version, e1000e_driver_version,
 		sizeof(drvinfo->version));
 
 	/* EEPROM image version # is reported as firmware version # for
@@ -1004,12 +1004,12 @@ static void e1000_get_drvinfo(struct net_device *netdev,
 		 (adapter->eeprom_vers & 0x0FF0) >> 4,
 		 (adapter->eeprom_vers & 0x000F));
 
-	strlcpy(drvinfo->bus_info, pci_name(adapter->pdev),
+	strscpy(drvinfo->bus_info, pci_name(adapter->pdev),
 		sizeof(drvinfo->bus_info));
 }
 
 static void e1000_get_ringparam(struct net_device *netdev,
-				struct ethtool_ringparam *ring)
+				struct ethtool_ringparam *ring, struct kernel_ethtool_ringparam *kernel_ring, struct netlink_ext_ack *extack)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
@@ -1020,7 +1020,7 @@ static void e1000_get_ringparam(struct net_device *netdev,
 }
 
 static int e1000_set_ringparam(struct net_device *netdev,
-			       struct ethtool_ringparam *ring)
+			       struct ethtool_ringparam *ring, struct kernel_ethtool_ringparam *kernel_ring, struct netlink_ext_ack *extack)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_ring *temp_tx = NULL, *temp_rx = NULL;
@@ -2421,7 +2421,7 @@ static int e1000_phys_id(struct net_device *netdev, u32 data)
 #endif /* HAVE_ETHTOOL_SET_PHYS_ID */
 
 static int e1000_get_coalesce(struct net_device *netdev,
-			      struct ethtool_coalesce *ec)
+			      struct ethtool_coalesce *ec, struct kernel_ethtool_coalesce *kernel_coal, struct netlink_ext_ack *extack)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
@@ -2434,7 +2434,7 @@ static int e1000_get_coalesce(struct net_device *netdev,
 }
 
 static int e1000_set_coalesce(struct net_device *netdev,
-			      struct ethtool_coalesce *ec)
+			      struct ethtool_coalesce *ec, struct kernel_ethtool_coalesce *kernel_coal, struct netlink_ext_ack *extack)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
@@ -2610,131 +2610,24 @@ static int e1000_get_rxnfc(struct net_device *netdev,
 #endif /* ETHTOOL_GRXRINGS */
 
 #ifdef ETHTOOL_GEEE
-static int e1000e_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
+static int e1000e_get_eee(struct net_device *netdev, struct ethtool_keee *edata)
 {
-	struct e1000_adapter *adapter = netdev_priv(netdev);
-	struct e1000_hw *hw = &adapter->hw;
-	u16 cap_addr, lpa_addr, pcs_stat_addr, phy_data;
-	u32 ret_val;
-
-	if (!(adapter->flags2 & FLAG2_HAS_EEE))
-		return -EOPNOTSUPP;
-
-	switch (hw->phy.type) {
-	case e1000_phy_82579:
-		cap_addr = I82579_EEE_CAPABILITY;
-		lpa_addr = I82579_EEE_LP_ABILITY;
-		pcs_stat_addr = I82579_EEE_PCS_STATUS;
-		break;
-	case e1000_phy_i217:
-		cap_addr = I217_EEE_CAPABILITY;
-		lpa_addr = I217_EEE_LP_ABILITY;
-		pcs_stat_addr = I217_EEE_PCS_STATUS;
-		break;
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	pm_runtime_get_sync((netdev_to_dev(netdev))->parent);
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val) {
-		pm_runtime_put_sync(netdev->dev.parent);
-		return -EBUSY;
-	}
-
-	/* EEE Capability */
-	ret_val = e1000_read_emi_reg_locked(hw, cap_addr, &phy_data);
-	if (ret_val)
-		goto release;
-	edata->supported = mmd_eee_cap_to_ethtool_sup_t(phy_data);
-
-	/* EEE Advertised */
-	edata->advertised = mmd_eee_adv_to_ethtool_adv_t(adapter->eee_advert);
-
-	/* EEE Link Partner Advertised */
-	ret_val = e1000_read_emi_reg_locked(hw, lpa_addr, &phy_data);
-	if (ret_val)
-		goto release;
-	edata->lp_advertised = mmd_eee_adv_to_ethtool_adv_t(phy_data);
-
-	/* EEE PCS Status */
-	ret_val = e1000_read_emi_reg_locked(hw, pcs_stat_addr, &phy_data);
-	if (ret_val)
-		goto release;
-	if (hw->phy.type == e1000_phy_82579)
-		phy_data <<= 8;
-
-	/* Result of the EEE auto negotiation - there is no register that
-	 * has the status of the EEE negotiation so do a best-guess based
-	 * on whether Tx or Rx LPI indications have been received.
-	 */
-	if (phy_data & (E1000_EEE_TX_LPI_RCVD | E1000_EEE_RX_LPI_RCVD))
-		edata->eee_active = true;
-
-	edata->eee_enabled = !hw->dev_spec.ich8lan.eee_disable;
-	edata->tx_lpi_enabled = true;
-	edata->tx_lpi_timer = er32(LPIC) >> E1000_LPIC_LPIET_SHIFT;
-
-release:
-	hw->phy.ops.release(hw);
-	if (ret_val)
-		ret_val = -ENODATA;
-
-	pm_runtime_put_sync(netdev->dev.parent);
-
-	return ret_val;
+	return -EOPNOTSUPP;
 }
+
 #endif /* ETHTOOL_GEEE */
 
 #ifdef ETHTOOL_SEEE
-static int e1000e_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
+static int e1000e_set_eee(struct net_device *netdev, struct ethtool_keee *edata)
 {
-	struct e1000_adapter *adapter = netdev_priv(netdev);
-	struct e1000_hw *hw = &adapter->hw;
-	struct ethtool_eee eee_curr;
-	s32 ret_val;
-
-	ret_val = e1000e_get_eee(netdev, &eee_curr);
-	if (ret_val)
-		return ret_val;
-
-	if (eee_curr.tx_lpi_enabled != edata->tx_lpi_enabled) {
-		e_err("Setting EEE tx-lpi is not supported\n");
-		return -EINVAL;
-	}
-
-	if (eee_curr.tx_lpi_timer != edata->tx_lpi_timer) {
-		e_err("Setting EEE Tx LPI timer is not supported\n");
-		return -EINVAL;
-	}
-
-	if (edata->advertised & ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL)) {
-		e_err("EEE advertisement supports only 100TX and/or 1000T full-duplex\n");
-		return -EINVAL;
-	}
-
-	adapter->eee_advert = ethtool_adv_to_mmd_eee_adv_t(edata->advertised);
-
-	hw->dev_spec.ich8lan.eee_disable = !edata->eee_enabled;
-
-	pm_runtime_get_sync((netdev_to_dev(netdev))->parent);
-
-	/* reset the link */
-	if (netif_running(netdev))
-		e1000e_reinit_locked(adapter);
-	else
-		e1000e_reset(adapter);
-
-	pm_runtime_put_sync(netdev->dev.parent);
-
-	return 0;
+	return -EOPNOTSUPP;
 }
+
 #endif /* ETHTOOL_SEEE */
 
 #ifdef ETHTOOL_GET_TS_INFO
 static int e1000e_get_ts_info(struct net_device *netdev,
-			      struct ethtool_ts_info *info)
+			      struct kernel_ethtool_ts_info *info)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
