@@ -1,3 +1,14 @@
+> **This is a fork.**
+> Original project: [koljah-de/e1000e-dkms-debian](https://github.com/koljah-de/e1000e-dkms-debian)
+> (based on Intel's e1000e driver from https://sourceforge.net/projects/e1000/)
+>
+> This fork adds an NVM checksum validation bypass and updates the driver to
+> build against modern Linux kernels (tested on kernel 6.17.x / Proxmox VE).
+> See the [3.8.7-nvm-bypass release](../../releases) and the changelog below
+> for details.
+
+---
+
 # Intel e1000e ethernet adapter driver (DKMS version) for Debian
 
 __Intel® Network Adapter Driver for PCIe* Intel® Gigabit Ethernet Network Connections Under Linux*__
@@ -230,3 +241,18 @@ Once an 82579 device is attached to a VM, stop the VM and return the ownership t
 * Cleanup - remove obsolete member of adapter stuct
 * Fix - Handle Management Engine blocking PHY access for a time after resests
 * Fix - Semaphore imbalance for 82573 parts
+
+**Changelog for 3.8.7-nvm-bypass (this fork, 2026)**
+* Bypass NVM checksum validation in `netdev.c` — works around the long-standing
+  "NVM Checksum Error" affecting Intel I219 NICs on certain boards (checksum
+  fails but hardware is functional; Windows ignores this check entirely)
+* Updated timer API calls (`del_timer_sync`, `from_timer`) for kernel 6.17
+* `strlcpy` → `strscpy`
+* Removed obsolete PCIe AER hooks (`pci_enable/disable_pcie_error_reporting`)
+* Updated `ethtool_ops` callback signatures (ringparam, coalesce, ts_info, EEE)
+  for current kernel API
+* Stubbed out `ptp.c` — PTP/hardware timestamping disabled; not required for
+  basic NIC operation, and the current PTP API is incompatible with this
+  driver version
+* Added one-command DKMS install script (`install.sh`)
+* Tested on kernel `6.17.2-1-pve` (Proxmox VE), Intel Ethernet Connection I219-LM
