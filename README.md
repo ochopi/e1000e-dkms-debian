@@ -3,7 +3,7 @@
 > (based on Intel's e1000e driver from https://sourceforge.net/projects/e1000/)
 >
 > This fork adds an NVM checksum validation bypass and updates the driver to
-> build against modern Linux kernels (tested on kernel 6.17.x / Proxmox VE).
+> build against modern Linux kernels (tested on kernel 6.17.x & 7.0.x / Proxmox VE).
 > See the [3.8.7-nvm-bypass release](../../releases) and the changelog below
 > for details.
 
@@ -17,6 +17,23 @@ This is a Debian DKMS package version of the latest code of Intels e1000e ethern
 
 ---
 
+## ⚠️ Scope of this fork
+
+This fork has only been built and tested against version `3.8.7`, on
+kernels `6.17.x` and `7.0.x` (Proxmox VE). The `.deb` packaging path below
+(`dpkg-deb --build`, `DEBIAN/postinst`) is inherited from the original
+project and has **not** been tested in this fork — only the manual DKMS
+path (`dkms add/build/install`, or the provided `install.sh`) has been
+verified to work. Compatibility with older kernels (as claimed in the
+original project's changelog) is not verified here.
+
+**Recommended path for this fork:**  
+Use `install.sh` — see the [Release notes](../../releases) for the tested one-command install.
+
+
+
+---
+
 ## Prerequisites
 **Dependency:** dkms
 
@@ -24,6 +41,9 @@ You should have installed: linux-headers dkms build-essential
 ```
 apt install linux-headers-$(uname -r) dkms build-essential
 ```
+> **Proxmox note:**  
+> The headers package is `pve-headers-$(uname -r)`, not `linux-headers-$(uname -r)`.  
+> Also, **Secure Boot must be disabled** (or the module signed with your own MOK) for this unsigned self-signed module to load.
 
 ---
 
@@ -50,15 +70,15 @@ dpkg-deb --build e1000e-dkms
 
 If you want to use the DKMS kernel module only (works with all Linux distributions) run:
 ```
-cp -r e1000e-dkms/usr/src/e1000e-<x.x.x> /usr/src/
-dkms add -m e1000e -v <x.x.x>
-dkms build -m e1000e -v <x.x.x>
-dkms install -m e1000e -v <x.x.x>
+cp -r e1000e-dkms/usr/src/e1000e-3.8.7 /usr/src/
+dkms add -m e1000e -v 3.8.7
+dkms build -m e1000e -v 3.8.7
+dkms install -m e1000e -v 3.8.7
 ```
 
 To remove the DKMS kernel module only (works with all Linux distributions) run:
 ```
-dkms remove -m e1000e -v <x.x.x> --all
+dkms remove -m e1000e -v 3.8.7 --all
 ```
 
 ---
